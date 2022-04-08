@@ -213,6 +213,7 @@ contract BankAccounts {
                                   false);
     }
 
+    //mcr: This may be vulnerable, because the  msg.sender, blockhash(block.number - 1), block.number - 1 are all predictable,  _randNonce can be brute forces, keccak256 is known to public, suggest to use Encryption here
     function getRandom() private view returns (bytes32 random) {
         _randNonce++;
         return bytes32(keccak256(abi.encodePacked(this, msg.sender, blockhash(block.number - 1), block.number - 1,

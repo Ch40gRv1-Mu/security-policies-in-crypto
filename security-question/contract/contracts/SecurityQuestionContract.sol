@@ -73,6 +73,9 @@ contract SecurityQuestionContract {
 
         uint[2] memory output;
 
+        // mcr: check the meaning here:
+        //reference: https://medium.com/@rbkhmrcr/precompiles-solidity-e5d29bd428c4
+        //bn256Add lives at0x06, and performs (x1, y1) + (x2, y2), with x1, y1, x2, and y2 as 256 bit field elements, such that (x1, y1) and (x2, y2) are valid points on the curve bn256, which has equation y^2 = x^3 + 3 mod fieldOrder. The inputs here are simply x1, y1, x2, y2.
         assembly {
             if iszero(staticcall(gas(), 0x06, input, 0x80, output, 0x40)) {
                 revert(0,0)
@@ -93,6 +96,7 @@ contract SecurityQuestionContract {
         bool success;
 
         assembly {
+            //bn256ScalarMul lives at 0x07, and performs k * (x, y), for k in a group with the order of the curve, and (x, y) a valid curve point as above. The inputs here are x, y, k.
             success := call(sub(gas(), 2000), 7, 0, input, 0x80, out, 0x60)
             // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
@@ -144,7 +148,7 @@ contract SecurityQuestionContract {
         {
             input[i * 6 + 0] = g1Elements[i].x;
             input[i * 6 + 1] = g1Elements[i].y;
-            input[i * 6 + 2] = g2Elements[i].coeffs_x[0];
+            input[i * 6 + 2] = g2Elements[i].coeffs_x[0]; 
             input[i * 6 + 3] = g2Elements[i].coeffs_x[1];
             input[i * 6 + 4] = g2Elements[i].coeffs_y[0];
             input[i * 6 + 5] = g2Elements[i].coeffs_y[1];
@@ -155,11 +159,13 @@ contract SecurityQuestionContract {
 
         // solium-disable-next-line security/no-inline-assembly
         assembly {
+            //bn256Pairing lives at 0x08. This takes as input arbitrarily many pairs of elliptic curve points, and performs the pairing check e(g1, g2) = e(-h1, h2), with g1 and h1 from G1, and g2 and h2 from G2.
+                // Points from G1 have the form (x, y), as we have seen above;
+                // Points from G2 have the form (ai + b, ci + d), and a, b, c, d (in that order — imaginary, real, imaginary, real) need to be supplied in the precompile call. The bn256Pairing code first checks that a multiple of 6 elements have been sent, and then performs the pairings check(s).
             success := call(sub(gas(), 2000), 8, 0, add(input, 0x20), mul(inputSize, 0x20), out, 0x20)
             // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
         }
-
         require(success, "Call to precompiled contract failed");
         return out[0] != 0;
     }
@@ -346,6 +352,7 @@ contract SecurityQuestionContract {
     function getChallengeForNZIK2(address group, bytes memory id, uint[2] memory cR, uint[2] memory gR, uint xMember) public view returns (uint) {
         for (uint i = 0; i < groups[group].attempts[id].parts.length; i++) {
             if (groups[group].attempts[id].parts[i].x == xMember) {
+                // mcr: Thisdo not quiet understand this line
                 bytes32 challengeNZIK2 = sha256(abi.encodePacked(cR[0], cR[1], gR[0], gR[1], groups[group].attempts[id].c_0_tilde.x, groups[group].attempts[id].c_0_tilde.y));
                 return uint(challengeNZIK2) % curveOrder;
             }

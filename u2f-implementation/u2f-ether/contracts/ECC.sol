@@ -48,6 +48,8 @@ library ECC {
 
         uint keyOffset = 4;
 
+        //mcr:what does the points here mean
+
         // check if first point is padded
         if (signature[keyOffset] == 0) {
             keyOffset++;
